@@ -375,9 +375,6 @@ void StartDefaultTask(void *argument)
   /* USER CODE END 5 */
 }
 
-
-
-
  /* MPU Configuration */
 
 void MPU_Config(void)
