@@ -19,9 +19,12 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "lwip.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+#include <socket.h>
 
 /* USER CODE END Includes */
 
@@ -42,6 +45,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 
+UART_HandleTypeDef huart3;
+
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
@@ -51,15 +56,22 @@ const osThreadAttr_t defaultTask_attributes = {
 };
 /* USER CODE BEGIN PV */
 
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MPU_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_USART3_UART_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
-
+int __io_putchar(int ch) {
+  char cha = ch;
+  HAL_UART_Transmit(&huart3, (uint8_t*) &cha, 1, HAL_MAX_DELAY);
+  return ch;
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -98,6 +110,8 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -189,7 +203,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV1;
   RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV1;
 
@@ -199,8 +213,80 @@ void SystemClock_Config(void)
   }
 }
 
-/* USER CODE BEGIN 4 */
+/**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
 
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 115200;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+
+  /* USER CODE END MX_GPIO_Init_1 */
+
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+
+  /* USER CODE END MX_GPIO_Init_2 */
+}
+
+/* USER CODE BEGIN 4 */
+[[gnu::section(".LWIP_RAM")]] volatile uint8_t LWIP_RAM[16000];
+
+uint8_t eth_rx_buf[128];
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -212,7 +298,75 @@ void SystemClock_Config(void)
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
+  /* init code for LWIP */
+  MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
+
+  (void) LWIP_RAM[0];
+
+
+  int sock = lwip_socket(AF_INET, SOCK_STREAM, 0);
+
+  struct sockaddr_in serveradd;
+  serveradd.sin_family = AF_INET;
+  serveradd.sin_addr.s_addr = htonl(INADDR_ANY);
+  serveradd.sin_port = htons(8000);
+
+  if((lwip_bind(sock, (struct sockaddr*) &serveradd, sizeof(serveradd))) != ERR_OK) {
+    printf("socket bind failed...\n");
+    while(1) osDelay(1000);
+  }
+
+  printf("Socket successfully bound!\n");
+
+
+  if((lwip_listen(sock, 5)) != ERR_OK) {
+    printf("Listen failed...\n");
+    while(1);
+  }
+
+  printf("Server listening..\n");
+
+  // Accept the data packet from client and verification
+  struct sockaddr_in cli;
+  socklen_t len = sizeof(cli);
+  int connfd = lwip_accept(sock, (struct sockaddr*) &cli, &len);
+  if(connfd < 0) {
+    printf("server accept failed...\n");
+    while(1);
+  }
+
+  printf("server accept the client...\n");
+
+  struct pollfd pfd = {
+    .fd = connfd,
+    .events = POLLIN | POLLRDNORM,
+    .revents = 0
+  };
+
+  while(1) {
+    int ret = lwip_poll(&pfd, 1, 1000);
+
+    if(ret > 0) {
+      if(pfd.revents == POLLIN) {
+        ssize_t bytes = lwip_read(connfd, eth_rx_buf, 128);
+        if(bytes > 0) {
+          if(lwip_write(connfd, eth_rx_buf, bytes) != bytes) {
+            printf("Didnt send all data back\n");
+          }
+        }
+      }
+    }
+
+    else if(ret < 0) {
+      printf("Poll error\n");
+      while(1);
+    }
+
+    else printf("No data\n");
+  }
+
+
   /* Infinite loop */
   for(;;)
   {
@@ -220,6 +374,9 @@ void StartDefaultTask(void *argument)
   }
   /* USER CODE END 5 */
 }
+
+
+
 
  /* MPU Configuration */
 
