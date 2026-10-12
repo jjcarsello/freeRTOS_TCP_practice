@@ -240,6 +240,35 @@ SECTIONS
     . = ALIGN(8);
   } >DTCMRAM
 
+  /* RAM_D2 layout for ETH/LwIP:
+   *   0x30000000  Rx DMA descriptors
+   *   0x30000080  Tx DMA descriptors
+   *   0x30004000  LwIP heap (LWIP_RAM_HEAP_POINTER; LWIP_RAM[16000] in main.c)
+   *   0x30008000  Rx pbuf pool (ETH_RX_BUFFER_CNT * sizeof(RxBuff_t), ~18.4KB for 12 buffers)
+   */
+   .RXDESCRIPTORS (NOLOAD) :
+   {
+     . = ABSOLUTE(0x30000000);
+     *(.RxDecripSection)
+   } > RAM_D2
+
+   .TXDESCRIPTORS (NOLOAD) :
+   {
+     . = ABSOLUTE(0x30000080);
+     *(.TxDecripSection)
+   } > RAM_D2
+
+   .LWIPRAM (NOLOAD) :
+    {
+      . = ABSOLUTE(0x30004000);
+      *(.LWIP_RAM)
+    } > RAM_D2
+
+  .LWIP (NOLOAD) :
+    {
+      . = ABSOLUTE(0x30008000);
+      *(.Rx_PoolSection)
+    } > RAM_D2
 
 
   /* Remove information from the standard libraries */
@@ -249,5 +278,6 @@ SECTIONS
     libm.a:* ( * )
     libgcc.a:* ( * )
   }
+
 
 }

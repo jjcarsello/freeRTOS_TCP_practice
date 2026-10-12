@@ -24,8 +24,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
-#include <socket.h>
-
+#include "sockets.h"
+#include "FreeRTOS.h"
+#include "task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,11 +52,10 @@ UART_HandleTypeDef huart3;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
+  .stack_size = 2048 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
-
 
 /* USER CODE END PV */
 
@@ -67,11 +67,18 @@ static void MX_USART3_UART_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
+
 int __io_putchar(int ch) {
+
+  if (ch == '\n') {
+    uint8_t cr = '\r';
+    HAL_UART_Transmit(&huart3, &cr, 1, HAL_MAX_DELAY);
+  }
   char cha = ch;
   HAL_UART_Transmit(&huart3, (uint8_t*) &cha, 1, HAL_MAX_DELAY);
   return ch;
 }
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -113,7 +120,10 @@ int main(void)
   MX_GPIO_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-  printf("Main Started");
+
+  printf("Main Block Started\r\n");
+
+
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -157,6 +167,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+
 
     /* USER CODE BEGIN 3 */
   }
@@ -287,6 +298,13 @@ static void MX_GPIO_Init(void)
 [[gnu::section(".LWIP_RAM")]] volatile uint8_t LWIP_RAM[16000];
 
 uint8_t eth_rx_buf[128];
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
+  (void) xTask;
+  taskDISABLE_INTERRUPTS();
+  printf("Stack overflow in task: %s\r\n", pcTaskName);
+  while(1);
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -301,6 +319,7 @@ void StartDefaultTask(void *argument)
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
+  /* Infinite loop */
 
   (void) LWIP_RAM[0];
 
@@ -317,6 +336,10 @@ void StartDefaultTask(void *argument)
     while(1) osDelay(1000);
   }
 
+  UBaseType_t space = uxTaskGetStackHighWaterMark(NULL);
+  printf("SPACE LEFT: %lu \n", space);
+
+
   printf("Socket successfully bound!\n");
 
 
@@ -324,6 +347,9 @@ void StartDefaultTask(void *argument)
     printf("Listen failed...\n");
     while(1);
   }
+
+
+
 
   printf("Server listening..\n");
 
@@ -336,6 +362,10 @@ void StartDefaultTask(void *argument)
     while(1);
   }
 
+
+  space = uxTaskGetStackHighWaterMark(NULL);
+  printf("SPACE LEFT: %lu \n", space);
+
   printf("server accept the client...\n");
 
   struct pollfd pfd = {
@@ -343,6 +373,7 @@ void StartDefaultTask(void *argument)
     .events = POLLIN | POLLRDNORM,
     .revents = 0
   };
+
 
   while(1) {
     int ret = lwip_poll(&pfd, 1, 1000);
@@ -366,11 +397,10 @@ void StartDefaultTask(void *argument)
     else printf("No data\n");
   }
 
-
-  /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    printf("Running Default Task\r\n");
+    osDelay(1000);
   }
   /* USER CODE END 5 */
 }
